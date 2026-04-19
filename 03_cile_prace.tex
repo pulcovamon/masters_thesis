@@ -1,0 +1,17 @@
+The main goal of this thesis is to design and implement a web application for visualization and analysis of longitudinal administrative patient data. The application works as a data catalog for outputs of machine learning models. So the results of disease prediction models can be used by people who are not data scientists, for example healthcare professionals or real-world evidence specialists.
+
+To reach this main goal, the work is split into several sub-goals:
+
+\begin{itemize}
+    \item \textbf{Review of technologies and model experimentation.} Review relevant technologies for representing and processing sequential electronic health records. Then do practical experiments with different predictive approaches on longitudinal patient data. For example Hidden Markov Models and TF-IDF combined with classifiers.
+
+    \item \textbf{User experience (UX) design.} Use a user-centered design approach. It means to define target user personas, do hierarchical task analysis, and design wireframes. So the resulting user interface is intuitive for the target audience.
+
+    \item \textbf{System architecture design.} Design the software architecture of the application. This includes the frontend client, an asynchronous backend application that can handle machine learning tasks, and integration of several database systems for structured and also unstructured data.
+
+    \item \textbf{Implementation of the web application.} Implement the core application for managing and analyzing outputs of machine learning models. It includes interactive visual components for exploring longitudinal patient data and also basic features like data pagination, filtering, and user authentication.
+
+    \item \textbf{Implementation of model deployment and scoring.} Extend the application so users can upload and manage new predictive models in a secure way. Implement an asynchronous scoring system which can process manual data entry or bulk dataset uploads to generate and display predictions.
+
+    \item \textbf{Extensibility and deployment preparation.} Make the system modular. So new models and features can be added later without rewriting the existing code. Also prepare the whole application stack for deployment on a server. It is done by configuring reverse proxies and by containerizing the environment.
+\end{itemize}

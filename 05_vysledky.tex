@@ -1,0 +1,262 @@
+% Results chapter — plan + first section draft
+% Data Catalog thesis, Monika Pulcová
+
+The current table of contents lists 18 sub-sections, which is too many flat items for a Results chapter. So a small restructure is proposed. The goal is to group sub-sections by feature area, so the reader can navigate one user-facing capability at a time. Also, two sub-sections ("Overview of the implemented system" and "Current implementation status") are merged into one short opening section.
+
+Proposed structure (renumbered, still under chapter 5):
+
+5.1 Overview of the implemented system
+ — One page. What was built end-to-end, the URL/entry point in development, the default user roles, and a deployment screenshot or a top-level architecture diagram. Closes with a short status note ("what is done, what is partially done, what is in the pipeline"), which replaces the current separate 5.14.
+
+5.2 Training data catalog and longitudinal data visualization
+ 5.2.1 Catalog list view (the current 5.3)
+ 5.2.2 Accuracy heatmap tab on the list view
+ 5.2.3 Patient detail view with per-patient heatmap (the current 5.4)
+ 5.2.4 Color-coding modes for the code sequence (Specialty, TF-IDF, Frequency)
+ 5.2.5 Filtering, pagination, and URL-based highlighting (the current 5.5)
+
+5.3 Disease scoring system
+ 5.3.1 Multi-step scoring form (the current 5.6)
+ 5.3.2 Model selection step and permission-based visibility (merges 5.7 and 5.13)
+ 5.3.3 Manual code entry with fuzzy-search autocomplete (the current 5.8)
+ 5.3.4 Bulk CSV/JSON upload and preview (the current 5.9)
+ 5.3.5 Asynchronous submission, task IDs, and prediction history (the current 5.10)
+
+5.4 Model management
+ 5.4.1 Model list and metadata (the current 5.11)
+ 5.4.2 Model upload interface (the current 5.12)
+ 5.4.3 Role-based access control and model visibility (partially covered already in 5.3.2, so here it is only the admin view)
+
+5.5 User account and cross-cutting UX features
+ 5.5.1 User account page (profile, role, session)
+ 5.5.2 Light and dark theme switcher
+ 5.5.3 Czech/English language switcher and URL-encoded locale
+
+5.6 Experimental model results
+ 5.6.1 Dataset and evaluation setup (short)
+ 5.6.2 HMM experiments (the current 5.16)
+ 5.6.3 TF-IDF with classical classifiers (the current 5.17)
+ 5.6.4 Comparison of predictive performance (the current 5.18)
+
+Notes for the whole chapter:
+- Every sub-section should open with one or two sentences that say what the feature is, then describe the screens, and then describe the implementation detail worth noting (the small things you said took a lot of time). So the reader gets a user-level description first and a developer-level one second.
+- Keep figure captions short and literal ("Fig. 5.X: Catalog list view, page 1, with total of 22,282 records"). No storytelling in captions.
+- For every screen shown, mention at least one concrete number (total records, number of codes per patient, accuracy value, response time). Numbers beat adjectives.
+- Use "we" for the implementation steps done during this work, and passive or "it is" for general descriptions of the system.
+
+# Part B — First section draft
+
+Below is a ready-to-use draft of 5.1 and 5.2, written in the thesis voice, with numeric biblatex citations (placeholder keys to be added to citace.bib — see Part C).
+
+---
+
+## 5.1 Overview of the implemented system
+
+The implemented application is a web data catalog for outputs of machine learning models trained on longitudinal administrative patient data. It works as a single-page application, accessible through a standard web browser. The user opens one URL and then navigates between several views without full-page reloads. The backend is a containerized REST API with a separate worker process for asynchronous predictions, as described in Section 4.2. For this chapter the focus is on what the user actually sees and can do, not on the architecture.
+
+The application has five main areas, each reachable from the top navigation bar (Fig. 5.1): Home, Scoring Form, Prediction History, Training Data, and Models. Also there is a Datasets page and a personal Account page. The Training Data area is the entry point for the RWE analyst persona, and it contains the longitudinal data visualizations. The Scoring Form area is the entry point for the clinical specialist persona, who wants to get a prediction for a new patient. These two flows share the same medical code dictionary, the same model registry, and the same authentication layer.
+
+In the development database, the catalog currently holds 22,282 patient records. One patient has on average tens to hundreds of five-digit procedure codes, with big variation between patients. For example, patient 49 has 332 codes, 64 distinct codes, and seven predictions made by different models, with an estimated accuracy of 86 % (Fig. 5.4). These numbers are used across the thesis as a reference case.
+
+All features described in the following sections are implemented and working. Some parts are only in a first functional version. For example, the wireframe-based usability testing from Section 4.3.4 was done on paper mockups, not on the deployed application, and the bulk JSON upload is more limited than the CSV one. These limitations are listed again in the Discussion in Chapter 6.
+
+## 5.2 Training data catalog and longitudinal data visualization
+
+Longitudinal patient data is hard to read in raw form. One patient can have hundreds of five-digit procedure codes, and the ordering, frequency, and clinical specialty of each code all matter. So the catalog offers three coordinated views of the same data. The first one is a list view where each patient is a row with a short code preview and a model accuracy summary. The second one is an accuracy heatmap over the whole catalog, where each patient is a column and each scoring category is a row. The third one is a per-patient detail view with a smaller heatmap and the full code sequence with several color-coding options. This pattern of overview plus detail is a standard approach for interactive visualization of electronic health records \autocite{borland2014innovative, wang2021ehrstar, sedig2020datadriven}.
+
+### 5.2.1 Catalog list view
+
+The list view (Fig. 5.2) is the default tab of the Training Data page. It shows one row per patient. Each row contains the patient ID, a preview of the first five procedure codes as rounded badges, a counter with the total code count ("+41", "+480"), the number of predictions made for this patient, and the estimated accuracy averaged across all predictions for this patient. Estimated accuracy is here defined as the proportion of model predictions that agree with the ground-truth label stored together with the record. A "Detail" button on each row opens the patient detail view described in Section 5.2.3.
+
+The list is paginated. The default page size is 20 rows, and the user can change it. For the current database of 22,282 records this gives 1,115 pages, which is shown next to the page selector. A total-record counter is also kept in a pill element in the header of the page ("Total records: 22,282"), so the user knows immediately how big the dataset is. Pagination was chosen over infinite scroll because clinicians wanted to be able to jump to a specific page and come back to it later. Infinite scroll loses the position when the browser tab is closed.
+
+Above the list there are two search inputs. The first one searches by Patient ID. The second one searches by a specific procedure code, and it highlights every cell where this code appears in the preview badges. So the user can scan which patients in the current cohort have a given code. We chose to implement this highlighting by synchronizing the search term with a URL query parameter, which is explained in more detail in Section 5.2.5.
+
+### 5.2.2 Accuracy heatmap over the catalog
+
+The second tab on the Training Data page is the Accuracy Heatmap (Fig. 5.3). It is a compact matrix view designed for the RWE analyst persona. Each column represents one patient, identified by the patient number (1, 2, 3, ...). Each row represents one scoring category: ICD10 Multiclass, ICD10 Binary, and Active Phase. The cell value is the per-patient accuracy of all predictions made in that scoring category, from 0 % to 100 %.
+
+The cell color encodes the same number once again. We used a single-hue sequential purple colormap. 0 % accuracy gets a very light color close to white, and 100 % accuracy gets a deep purple. The specific formula is a direct function in HSL space: the hue is fixed at 270 (purple), the saturation is fixed at 80 %, and the lightness goes from 85 % at 0 % accuracy to 14.5 % at 100 % accuracy. So low and high values are easy to distinguish at a glance, even in a dense view where many columns are next to each other. Single-hue sequential palettes are recommended for ordered data where the reader needs a clear sense of "more" or "less" rather than a categorical difference \autocite{tseng2024categorical}. We chose it over a diverging (red-green) palette because there is no natural zero point in the middle of the scale. Also, the text of the percentage is overlaid on the cell and automatically switches from black to white when the cell lightness drops below 50 %, so the number is always readable. The colormap is implemented without a charting library, only with the built-in d3-scale-chromatic package and plain CSS \autocite{hFigures2016}. Compared to full charting libraries like Chart.js or Recharts, this keeps the JavaScript bundle small and the rendering fast even with many visible cells.
+
+The heatmap uses the same pagination controls as the list view and shares the same URL state. So when a user filters the list to a specific patient ID or a specific code and then switches to the heatmap tab, the heatmap is narrowed down the same way. This way the two views stay synchronized.
+
+### 5.2.3 Patient detail view
+
+When the user clicks "Detail" on a row in the list view, they are taken to the patient detail page (Fig. 5.4). At the top there is a row of four summary counters: total codes, distinct codes, number of predictions, and estimated accuracy. For patient 49 these values are 332, 64, 7, and 86 %. These four numbers answer, on one glance, how long this patient history is, how diverse the code vocabulary is, how many models were evaluated on it, and how well the models did on average.
+
+Below the summary there is a smaller per-patient heatmap. It has the same three category rows as the catalog-level heatmap (ICD10 Multiclass, ICD10 Binary, Active Phase) but the columns now represent individual predictions made for this one patient, ordered in time (1, 2, 3, ...). The color scale is different here. A binary green/red coding is used, where green means the model prediction agrees with the ground-truth label and red means it does not. So a row of green cells is easy to scan, and any red cell is a moment where the model failed for this patient. This kind of chronological agreement view makes it easy to spot whether the model was wrong at the beginning of the record, at the end, or consistently \autocite{perer2012matrixflow, plaisant2018pharmacovigilance}.
+
+### 5.2.4 Color-coding modes for the code sequence
+
+Under the heatmap there is the full sequence of procedure codes for this patient, displayed as a grid of rounded code badges (Fig. 5.4, bottom). For patient 49 this is 332 badges in chronological order. Raw badges alone are not easy to read, so four alternative color-coding modes are offered. The user switches between them with a tab row above the list (Specialty, TF-IDF (0), TF-IDF (1), Frequency). A legend below the tabs explains what the colors mean in the active mode.
+
+The Specialty mode colors each badge by the medical specialty of the procedure (for example clinical oncology, pulmonology, fysiology). Codes that cannot be mapped to a known specialty are shown in white with an "Uncategorized" legend entry. This gives the reader a sense of which department the patient interacted with at each visit. On hover, the full Czech name of the specialty is shown as a tooltip (for example "Kontrolní vyšetření pneumologem, pneumologie a fzieologie").
+
+The TF-IDF (0) and TF-IDF (1) modes visualize how informative each code is for a given class label, using the Term Frequency-Inverse Document Frequency weight described in Section 4.1.2 \autocite{tfidf_icd_codes_2022}. Higher TF-IDF means the code is more specific for the selected label. Codes with a TF-IDF above a threshold are shown in a darker shade, so the clinician can visually pick out which procedures in the history most strongly drive the prediction toward label 0 or label 1. This is a simple form of feature-importance highlighting on top of a classical TF-IDF representation, and it helps to open the black box of the classifier \autocite{humbert2021structuring}. It is also the reason why both label 0 and label 1 have their own tab. So the user can switch between them and see which codes push the prediction one way and which push it the other way.
+
+The Frequency mode colors each code by how many times this specific code appears across the whole training catalog. Rare codes are shown in light color, frequent codes in dark gray. So the user sees at a glance if the patient history is dominated by routine procedures or if it contains unusual ones.
+
+Each of these modes uses a different sequential color scale from d3-scale-chromatic. The same color scale is used consistently inside one mode, so the user does not have to re-learn the legend for every patient. For the Specialty mode, which is categorical and not sequential, a qualitative palette is used instead, because categorical data needs hue variation and not lightness variation \autocite{tseng2024categorical}.
+
+### 5.2.5 Filtering, pagination, and URL-based highlighting
+
+All filter values in the catalog are stored in the browser URL, not only in component memory \autocite{sematic2023deeplinks}. For example, when the user searches for the code 89131, the URL becomes /catalog?code=89131 and every badge with value 89131 in the current page is highlighted. When the user then clicks "Detail" on patient 49, the code query parameter is passed along, so on the detail page the same code stays highlighted in the full 332-code sequence. And when the user clicks "Back to Catalog", the previous filter is restored. So the user does not lose their context.
+
+This approach has two practical advantages. The first one is reproducibility. A clinician or an RWE analyst can copy the current URL and send it to a colleague, and the colleague sees the exact same filtered view after login. This is important for collaborative analysis of patient cohorts. The second advantage is that the browser Back and Forward buttons work naturally inside the single-page application, because every filter change produces a new history entry.
+
+The URL also stores pagination information. So a bookmark to page 42 of the heatmap view keeps the pagination offset and the current tab. These small details together make the catalog feel like a regular website and not like a state-heavy web application, which was one of the goals from the UX flow in Section 4.3.2.
+
+Client-side caching is used on top of the URL state to avoid redundant backend calls \autocite{caching_ui_performance}. When the user moves from page 1 to page 2 and back to page 1, the first page is served from the cache. The same cache also serves the medical code dictionary used by the autocomplete in the scoring form (Section 5.3.3). So the autocomplete responds instantly, without a backend query for every keystroke. The medical code dictionary is loaded once per session, which is enough because it rarely changes.
+
+---
+
+# Part C — BibTeX entries for citace.bib
+
+These are the entries used in the draft above. Real, verified sources. Placeholder keys match those used in the \autocite{} commands.
+
+```bibtex
+@article{borland2014innovative,
+  author    = {Borland, David and West, Vivian L. and Hammond, W. Edward},
+  title     = {Innovative Information Visualization of Electronic Health Record Data: A Systematic Review},
+  journal   = {Journal of the American Medical Informatics Association},
+  year      = {2014},
+  volume    = {22},
+  number    = {2},
+  pages     = {330--339},
+  doi       = {10.1136/amiajnl-2014-002955},
+  url       = {https://pmc.ncbi.nlm.nih.gov/articles/PMC4394966/},
+}
+
+@article{wang2021ehrstar,
+  author    = {Wang, Qiru and Laramee, Robert S.},
+  title     = {{EHR STAR}: The State-Of-the-Art in Interactive {EHR} Visualization},
+  journal   = {Computer Graphics Forum},
+  year      = {2022},
+  volume    = {41},
+  number    = {1},
+  pages     = {69--105},
+  doi       = {10.1111/cgf.14424},
+  url       = {https://onlinelibrary.wiley.com/doi/pdfdirect/10.1111/cgf.14424},
+}
+
+@article{sedig2020datadriven,
+  author    = {Sedig, Kamran and Rostamzadeh, Neda and Abdullah, Sheikh S.},
+  title     = {Data-Driven Activities Involving Electronic Health Records: An Activity and Task Analysis Framework for Interactive Visualization Tools},
+  journal   = {Multimodal Technologies and Interaction},
+  year      = {2020},
+  volume    = {4},
+  number    = {1},
+  pages     = {7},
+  doi       = {10.3390/mti4010007},
+  url       = {https://www.mdpi.com/2414-4088/4/1/7/pdf},
+}
+
+@inproceedings{tseng2024categorical,
+  author    = {Tseng, Chin and Wang, Arran Zeyu and Quadri, Ghulam Jilani and Szafir, Danielle Albers},
+  title     = {Revisiting Categorical Color Perception in Scatterplots: Sequential, Diverging, and Categorical Palettes},
+  booktitle = {EuroVis 2024 - Short Papers},
+  year      = {2024},
+  doi       = {10.2312/evs.20241073},
+  url       = {https://arxiv.org/abs/2404.03787},
+}
+
+@article{hFigures2016,
+  author    = {Ledesma, Andres and Nieminen, Hannu and Al-Musawi, Mohammed},
+  title     = {Health Figures: An Open Source {JavaScript} Library for Health Data Visualization},
+  journal   = {BMC Medical Informatics and Decision Making},
+  year      = {2016},
+  volume    = {16},
+  pages     = {38},
+  doi       = {10.1186/s12911-016-0275-6},
+  url       = {https://pmc.ncbi.nlm.nih.gov/articles/PMC4802654/},
+}
+
+@inproceedings{perer2012matrixflow,
+  author    = {Perer, Adam and Sun, Jimeng},
+  title     = {{MatrixFlow}: Temporal Network Visual Analytics to Track Symptom Evolution During Disease Progression},
+  booktitle = {AMIA Annual Symposium Proceedings},
+  year      = {2012},
+  pages     = {716--725},
+  url       = {https://pmc.ncbi.nlm.nih.gov/articles/PMC3540494/},
+}
+
+@article{plaisant2018pharmacovigilance,
+  author    = {Ledieu, Thomas and Bouzill{\'e}, Guillaume and Plaisant, Catherine and Thiessard, Fr{\'e}d{\'e}rique and Polard, Elisabeth and Cuggia, Marc},
+  title     = {Clinical Data Analytics With Time-Related Graphical User Interfaces: Application to Pharmacovigilance},
+  journal   = {Frontiers in Pharmacology},
+  year      = {2018},
+  volume    = {9},
+  pages     = {717},
+  doi       = {10.3389/fphar.2018.00717},
+  url       = {https://pmc.ncbi.nlm.nih.gov/articles/PMC6127627/},
+}
+
+@article{tfidf_icd_codes_2022,
+  author    = {Humbert-Droz, Marie and Mukherjee, Pritam and Gevaert, Olivier},
+  title     = {Strategies to Address the Lack of Labeled Data for Supervised Machine Learning Training With Electronic Health Records: Case Study for the Extraction of Symptoms From Clinical Notes},
+  journal   = {JMIR Medical Informatics},
+  year      = {2022},
+  volume    = {10},
+  number    = {3},
+  pages     = {e32903},
+  doi       = {10.2196/32903},
+  note      = {Note: if you already have a different TF-IDF source keyed as tfidf\_icd\_codes\_2022 from Chapter 4, keep that one and delete this entry.}
+}
+
+@article{humbert2021structuring,
+  author    = {Zhan, Xianghao and Humbert-Droz, Marie and Mukherjee, Pritam and Gevaert, Olivier},
+  title     = {Structuring Clinical Text With {AI}: Old Versus New Natural Language Processing Techniques Evaluated on Eight Common Cardiovascular Diseases},
+  journal   = {Patterns},
+  year      = {2021},
+  volume    = {2},
+  number    = {7},
+  pages     = {100289},
+  doi       = {10.1016/j.patter.2021.100289},
+  url       = {https://pmc.ncbi.nlm.nih.gov/articles/PMC8276012/},
+}
+
+@online{sematic2023deeplinks,
+  author    = {{Sematic}},
+  title     = {Implementing Deep Links in {React} With Atoms},
+  year      = {2023},
+  url       = {https://www.sematic.dev/blog/implementing-deep-links-in-react-with-atoms},
+  urldate   = {2026-04-19},
+}
+
+@article{caching_ui_performance,
+  author    = {Nielsen, Jakob},
+  title     = {Response Times: The 3 Important Limits},
+  journal   = {Nielsen Norman Group},
+  year      = {1993},
+  url       = {https://www.nngroup.com/articles/response-times-3-important-limits/},
+  urldate   = {2026-04-19},
+}
+```
+
+# Part D — Summary of sources used (with relevance)
+
+1. Borland, West & Hammond (2014), JAMIA — a systematic review of 17 years of EHR visualization. Grounds the choice of "overview + detail" pattern used in the catalog.
+2. Wang & Laramee (2021/2022), Computer Graphics Forum — "EHR STAR" state-of-the-art survey of interactive EHR visualization. Useful both here and in the State of the Art chapter.
+3. Sedig, Rostamzadeh & Abdullah (2020), MTI — activity-and-task analysis framework for EHR interactive visualization tools. Directly supports the UX-driven decisions described in 5.2.
+4. Tseng, Wang, Quadri & Szafir (2024), EuroVis — empirical study of sequential vs diverging vs categorical color palettes. Used to justify the single-hue purple heatmap and the categorical Specialty palette.
+5. Ledesma, Nieminen & Al-Musawi (2016), BMC MIDM — hFigures JavaScript library for health data visualization. Cited as an example of lightweight, library-minimal visualization, which matches the custom heatmap implementation.
+6. Perer & Sun (2012), AMIA — MatrixFlow, a matrix-based time-evolving visualization for patient event sequences. Directly supports the "red/green chronological agreement" design of the per-patient heatmap.
+7. Ledieu, Bouzillé, Plaisant et al. (2018), Frontiers in Pharmacology — time-related GUI and timeline visualizations for EHR, tested with clinicians. Supports the clinical usability argument for a detail timeline.
+8. Humbert-Droz, Mukherjee & Gevaert (2022), JMIR Medical Informatics — TF-IDF with logistic regression on clinical text, including interpretation via important words. Backs the TF-IDF color-coding mode as an interpretability tool.
+9. Zhan et al. (2021), Patterns — TF-IDF and other NLP techniques on clinical notes, showing good AUROC with interpretable features. Reinforces the TF-IDF interpretability argument.
+10. Sematic (2023), blog — engineering write-up on deep linking in React SPAs via URL hash/query parameters. Used to cite the URL-state pattern of the catalog.
+11. Nielsen (1993), NN/g — the classic 0.1 s / 1 s / 10 s response-time limits. Cited for the client-side caching argument.
+
+# Part E — What to do next (after this section is approved)
+
+When this draft of 5.1 and 5.2 is good:
+
+1. Wireframe vs. final screenshot comparison. Consider adding a small figure at the start of 5.2 that places the original wireframe next to the final screenshot. It would make the UX-to-implementation link very concrete. If no wireframes were saved in a clean form, skip it.
+
+2. One accessibility paragraph. A short note on keyboard navigation, contrast ratios, and the automatic text color switch (black/white) on the heatmap. It would show that usability was thought through. It can be either in 5.2.2 or in 5.5.
+
+3. Then move on to 5.3 (Scoring form) and 5.4 (Models), for which you said more screenshots are coming. The same recipe will apply: open with what the feature does, describe screens with real numbers, then describe the implementation detail that took a lot of time.
+
+4. Finally 5.5 (cross-cutting UX) and 5.6 (experimental model results). 5.6 will need its own set of citations (HMM, TF-IDF, Random Forest, Logistic Regression), and a small comparison table.
+
+Please review the draft and tell me which parts to adjust. Typical edit requests you may have: "this is too long, cut it", "mention also X", "the voice is still too polished here", "move paragraph Y from 5.2.4 into 5.2.5". I will apply the feedback and then continue with 5.3.
